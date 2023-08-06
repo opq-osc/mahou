@@ -37,10 +37,9 @@ const run = async () => {
   Object.keys(selector).forEach((key) => {
     const list = html$(`${(selector as any)[key]} ul li`)
     list.each((_, element) => {
-      const select = cheerio.load(element)
-      const nav = select(`a.nav`)
-      const title = // @ts-expect-error
-        (nav?.[0]?.childNodes?.[0]?.data as string | undefined)?.trim?.()
+      const cnTitle = html$(element).find('div div :nth-child(1) a')?.text().trim()
+      const jpTitle = html$(element).find('div div :nth-child(2) a')?.text().trim()
+      const title = cnTitle || jpTitle
       const bg = element.attribs.style
       const extractBg = bg.match(/background:url\('(.*?)'\)/)?.[1]
       const urlWithoutProtocol = extractBg?.replace(
