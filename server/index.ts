@@ -1,9 +1,10 @@
 import express from 'express'
-import { existsSync, readFileSync, statSync } from 'fs'
+import { existsSync, readFileSync, statSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import dayjs from 'dayjs'
 import { getAllData } from './data'
 import nodeHtmlToImage from 'node-html-to-image'
+import { pngQuantize } from '@napi-rs/image'
 
 const htmlPath = join(__dirname, './index.html')
 const outputPath = join(__dirname, './output.png')
@@ -19,8 +20,24 @@ const bangumi = JSON.parse(readFileSync(bangumiPath, 'utf-8')) as Record<
   any
 >
 
+let isRunning = false
+
 const run = async () => {
-  const render = async (day: string) => {
+  const compress = async () => {
+    if (!existsSync(outputPath)) {
+      console.error(`${pluginName}: compress failed, file not found`)
+      return
+    }
+    console.log(`${pluginName}: trigger compress`)
+    const fileBuffer = readFileSync(outputPath)
+    const compressedBuffer = await pngQuantize(fileBuffer, {
+      maxQuality: 80,
+    })
+    console.log(`${pluginName}: trigger compress success`)
+    console.log(`${pluginName}: write file`)
+    writeFileSync(outputPath, compressedBuffer)
+  }
+  const render = async (day: string, needCompress = false) => {
     // if create time is today, use cache
     if (existsSync(outputPath)) {
       const stats = statSync(outputPath)
@@ -33,6 +50,11 @@ const run = async () => {
       }
     }
 
+    // TODO: pm2
+    if (isRunning) {
+      return
+    }
+    isRunning = true
     console.log(`${pluginName}: get all remote data`)
     const remoteData = await getAllData()
     console.log(`${pluginName}: get all remote data success`)
@@ -67,12 +89,31 @@ const run = async () => {
       },
     })
     console.log(`${pluginName}: render over for ${day}`)
+    isRunning = false
+
+    if (needCompress) {
+      await compress()
+    }
     return buffer
   }
 
-  if (process.argv.includes('--generate')){
-    const mark = dayjs().format('ddd').toLowerCase()
-    await render(mark)
+  const getDayMark = () => {
+    return dayjs().format('ddd').toLowerCase()
+  }
+  const useGenerate = process.argv.includes('--generate')
+  if (useGenerate){
+    const useCompress = process.argv.includes('--compress')
+    console.log(`${pluginName}: generate mode`)
+    const mark = getDayMark()
+    try {
+      console.log(`${pluginName}: trigger render`)
+      await render(mark, useCompress)
+      console.log(`${pluginName}: render success for ${mark}`)
+    } catch (e) {
+      console.error(`${pluginName}: render failed for ${mark}`)
+      console.error(e)
+      return
+    }
     return
   }
 
@@ -80,8 +121,9 @@ const run = async () => {
   app.get(`/api/v1/dayNews`, async (req, res) => {
     try {
       console.log(`${pluginName}: trigger render`)
-      const mark = dayjs().format('ddd').toLowerCase()
-      const buffer = await render(mark)
+      const mark = getDayMark()
+      const useCompress = !!req.query?.compress?.length
+      const buffer = await render(mark, useCompress)
       if (!buffer || !existsSync(outputPath)) {
         console.error(`${pluginName}: render failed for ${mark}`)
         throw new Error('render failed')

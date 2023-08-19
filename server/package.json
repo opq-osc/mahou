@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "dependencies": {
+    "@napi-rs/image": "^1.6.1",
     "cheerio": "1.0.0-rc.12",
     "dayjs": "^1.11.9",
     "express": "^4.18.2",
