@@ -20,7 +20,6 @@ const bangumi = JSON.parse(readFileSync(bangumiPath, 'utf-8')) as Record<
 >
 
 const run = async () => {
-  const app = express()
   const render = async (day: string) => {
     // if create time is today, use cache
     if (existsSync(outputPath)) {
@@ -70,6 +69,14 @@ const run = async () => {
     console.log(`${pluginName}: render over for ${day}`)
     return buffer
   }
+
+  if (process.argv.includes('--generate')){
+    const mark = dayjs().format('ddd').toLowerCase()
+    await render(mark)
+    return
+  }
+
+  const app = express()
   app.get(`/api/v1/dayNews`, async (req, res) => {
     try {
       console.log(`${pluginName}: trigger render`)

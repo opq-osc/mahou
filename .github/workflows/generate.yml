@@ -1,0 +1,32 @@
+name: Generate
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: 0 0/1 * * *
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+
+      - run: npm i -g pnpm
+
+      - run: pnpm rm mahiro && pnpm i && pnpm sync:bgm
+        working-directory: ./mahiro
+
+      - run: pnpm i && pnpm build
+        working-directory: ./render/common
+
+      - run: pnpm i && pnpm copy && pnpm start --generate
+        working-directory: ./server
+
+      - uses: actions/upload-artifact@v3.1.2
+        with:
+          name: output
+          path: ./server/output.png
+          retention-days: 1
